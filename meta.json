@@ -1,0 +1,41 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "viam-labs:cup-mover",
+  "visibility": "public",
+  "url": "https://github.com/viam-labs/cup-mover",
+  "description": "Picks up a cup, moves it through three positions, and sets it back down.",
+  "models": [
+    {
+      "api": "rdk:service:generic",
+      "model": "viam-labs:cup-mover:cup-mover",
+      "short_description": "Orchestrates an arm to move a cup through three poses.",
+      "markdown_link": "README.md#model-viam-labscup-movercup-mover"
+    },
+    {
+      "api": "rdk:component:switch",
+      "model": "viam-labs:cup-mover:multi-poses-execution-switch",
+      "short_description": "Switch that moves a component to one of N named absolute poses via the Motion service.",
+      "markdown_link": "README.md#model-viam-labscup-movermulti-poses-execution-switch"
+    },
+    {
+      "api": "rdk:service:generic",
+      "model": "viam-labs:cup-mover:dial-control-motion",
+      "short_description": "Nudges an arm by configurable steps for interactive pose tuning (jog or Stream Deck dial).",
+      "markdown_link": "README.md#model-viam-labscup-moverdial-control-motion"
+    }
+  ],
+  "applications": null,
+  "markdown_link": "README.md",
+  "entrypoint": "bin/cup-mover",
+  "first_run": "",
+  "build": {
+    "build": "make module.tar.gz",
+    "setup": "make setup",
+    "path": "module.tar.gz",
+    "arch": [
+      "linux/amd64",
+      "linux/arm64",
+      "darwin/arm64"
+    ]
+  }
+}
