@@ -32,12 +32,15 @@ type Config struct {
 	PauseSecs      float64 `json:"pause_secs,omitempty"`
 }
 
-// Step is one entry in the run sequence: move to Pose, then optionally do
+// Step is one entry in the run sequence: move to a named switch waypoint (a
+// pose or a joint position, depending on the switch's mode), then optionally do
 // something with the gripper. Grip values: "grab", "open", "open_grab", or ""
-// (no gripper action). Same pose may appear multiple times with different grips.
+// (no gripper action). The same waypoint may appear multiple times with
+// different grips.
 type Step struct {
-	Pose string `json:"pose"`
-	Grip string `json:"grip,omitempty"`
+	// Waypoint is the switch position name to move to.
+	Waypoint string `json:"waypoint"`
+	Grip     string `json:"grip,omitempty"`
 }
 
 func (cfg *Config) Validate(path string) ([]string, []string, error) {
@@ -134,7 +137,7 @@ func (s *cupMover) run(ctx context.Context) ([]string, error) {
 	if len(steps) == 0 {
 		steps = make([]Step, len(names))
 		for i, n := range names {
-			steps[i] = Step{Pose: n}
+			steps[i] = Step{Waypoint: n}
 		}
 	}
 
@@ -153,17 +156,17 @@ func (s *cupMover) run(ctx context.Context) ([]string, error) {
 	visited := make([]string, 0, len(steps))
 
 	for i, step := range steps {
-		idx, ok := indexByName[step.Pose]
+		idx, ok := indexByName[step.Waypoint]
 		if !ok {
-			return visited, fmt.Errorf("pose %q not found on switch %q", step.Pose, s.cfg.PoseSwitchName)
+			return visited, fmt.Errorf("waypoint %q not found on switch %q", step.Waypoint, s.cfg.PoseSwitchName)
 		}
 
-		s.logger.Infof("step %d/%d: %s (grip=%q)", i+1, len(steps), step.Pose, step.Grip)
+		s.logger.Infof("step %d/%d: %s (grip=%q)", i+1, len(steps), step.Waypoint, step.Grip)
 
 		if err := s.sw.SetPosition(ctx, idx, nil); err != nil {
-			return visited, fmt.Errorf("moving to %q: %w", step.Pose, err)
+			return visited, fmt.Errorf("moving to %q: %w", step.Waypoint, err)
 		}
-		visited = append(visited, step.Pose)
+		visited = append(visited, step.Waypoint)
 
 		if err := s.applyGrip(ctx, step); err != nil {
 			return visited, err
@@ -189,20 +192,20 @@ func (s *cupMover) applyGrip(ctx context.Context, step Step) error {
 		return nil
 	}
 	if s.gripper == nil {
-		return fmt.Errorf("step %q requests grip=%q but no gripper is configured", step.Pose, step.Grip)
+		return fmt.Errorf("step %q requests grip=%q but no gripper is configured", step.Waypoint, step.Grip)
 	}
 	switch step.Grip {
 	case "open":
 		if err := s.gripper.Open(ctx, nil); err != nil {
-			return fmt.Errorf("opening gripper at %q: %w", step.Pose, err)
+			return fmt.Errorf("opening gripper at %q: %w", step.Waypoint, err)
 		}
 	case "grab":
 		if _, err := s.gripper.Grab(ctx, nil); err != nil {
-			return fmt.Errorf("grabbing at %q: %w", step.Pose, err)
+			return fmt.Errorf("grabbing at %q: %w", step.Waypoint, err)
 		}
 	case "open_grab":
 		if err := s.gripper.Open(ctx, nil); err != nil {
-			return fmt.Errorf("opening gripper at %q: %w", step.Pose, err)
+			return fmt.Errorf("opening gripper at %q: %w", step.Waypoint, err)
 		}
 
 		select {
@@ -214,10 +217,10 @@ func (s *cupMover) applyGrip(ctx context.Context, step Step) error {
 		}
 
 		if _, err := s.gripper.Grab(ctx, nil); err != nil {
-			return fmt.Errorf("grabbing at %q: %w", step.Pose, err)
+			return fmt.Errorf("grabbing at %q: %w", step.Waypoint, err)
 		}
 	default:
-		return fmt.Errorf("unknown grip %q at step %q (supported: open, grab, open_grab)", step.Grip, step.Pose)
+		return fmt.Errorf("unknown grip %q at step %q (supported: open, grab, open_grab)", step.Grip, step.Waypoint)
 	}
 	return nil
 }

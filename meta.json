@@ -14,7 +14,7 @@
     {
       "api": "rdk:component:switch",
       "model": "viam-labs:cup-mover:multi-poses-execution-switch",
-      "short_description": "Switch that moves a component to one of N named absolute poses via the Motion service.",
+      "short_description": "Switch that moves to one of N named waypoints — absolute poses via the Motion service, or raw joint positions on the arm.",
       "markdown_link": "README.md#model-viam-labscup-movermulti-poses-execution-switch"
     },
     {
