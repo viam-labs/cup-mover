@@ -14,13 +14,13 @@
     {
       "api": "rdk:component:switch",
       "model": "viam-labs:cup-mover:multi-poses-execution-switch",
-      "short_description": "Switch that moves a component to one of N named absolute poses via the Motion service.",
+      "short_description": "Switch that moves to one of N named waypoints — absolute poses via the Motion service, or raw joint positions on the arm.",
       "markdown_link": "README.md#model-viam-labscup-movermulti-poses-execution-switch"
     },
     {
       "api": "rdk:service:generic",
       "model": "viam-labs:cup-mover:dial-control-motion",
-      "short_description": "Nudges an arm by configurable steps for interactive pose tuning (jog or Stream Deck dial).",
+      "short_description": "Nudges an arm by configurable steps for interactive waypoint tuning (Cartesian jog, joint jog, or Stream Deck dial) with pose/joint capture.",
       "markdown_link": "README.md#model-viam-labscup-moverdial-control-motion"
     }
   ],

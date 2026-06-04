@@ -6,7 +6,7 @@ import (
 )
 
 func TestValidate(t *testing.T) {
-	pose := Pose{Name: "a", X: 100, Y: 200, Z: 300, OZ: 1, Theta: 45}
+	pose := Waypoint{Name: "a", X: 100, Y: 200, Z: 300, OZ: 1, Theta: 45}
 
 	tests := []struct {
 		name    string
@@ -15,16 +15,16 @@ func TestValidate(t *testing.T) {
 	}{
 		{
 			name:    "missing component_name",
-			cfg:     Config{Motion: "builtin", Poses: []Pose{pose}},
+			cfg:     Config{Motion: "builtin", Waypoints: []Waypoint{pose}},
 			wantErr: "component_name",
 		},
 		{
-			name:    "missing motion",
-			cfg:     Config{ComponentName: "arm", Poses: []Pose{pose}},
+			name:    "missing motion in pose mode",
+			cfg:     Config{ComponentName: "arm", Waypoints: []Waypoint{pose}},
 			wantErr: "motion",
 		},
 		{
-			name:    "no poses",
+			name:    "no waypoints",
 			cfg:     Config{ComponentName: "arm", Motion: "builtin"},
 			wantErr: "poses",
 		},
@@ -32,7 +32,7 @@ func TestValidate(t *testing.T) {
 			name: "missing name",
 			cfg: Config{
 				ComponentName: "arm", Motion: "builtin",
-				Poses: []Pose{{X: 1}},
+				Waypoints: []Waypoint{{X: 1}},
 			},
 			wantErr: `"name"`,
 		},
@@ -40,27 +40,53 @@ func TestValidate(t *testing.T) {
 			name: "duplicate name",
 			cfg: Config{
 				ComponentName: "arm", Motion: "builtin",
-				Poses: []Pose{pose, pose},
+				Waypoints: []Waypoint{pose, pose},
 			},
 			wantErr: "duplicate",
+		},
+		{
+			name: "unknown mode",
+			cfg: Config{
+				ComponentName: "arm", Mode: "cartesian",
+				Waypoints: []Waypoint{pose},
+			},
+			wantErr: "unknown mode",
+		},
+		{
+			name: "joint mode missing joints",
+			cfg: Config{
+				ComponentName: "arm", Mode: ModeJoint,
+				Waypoints: []Waypoint{{Name: "a"}},
+			},
+			wantErr: "joints",
 		},
 		{
 			name: "valid single pose",
 			cfg: Config{
 				ComponentName: "arm", Motion: "builtin",
-				Poses: []Pose{pose},
+				Waypoints: []Waypoint{pose},
 			},
 		},
 		{
 			name: "valid multiple poses",
 			cfg: Config{
 				ComponentName: "arm", Motion: "builtin",
-				Poses: []Pose{
+				Waypoints: []Waypoint{
 					{Name: "pickup", Z: 100, OZ: 1},
 					{Name: "p1", X: 100, Z: 200, OZ: 1},
 					{Name: "p2", X: 200, Z: 200, OZ: 1},
 					{Name: "p3", X: 300, Z: 200, OZ: 1},
 					{Name: "putdown", X: 300, Z: 100, OZ: 1},
+				},
+			},
+		},
+		{
+			name: "valid joint mode (no motion required)",
+			cfg: Config{
+				ComponentName: "arm", Mode: ModeJoint,
+				Waypoints: []Waypoint{
+					{Name: "home", Joints: []float64{0, 0, 0, 0, 0, 0}},
+					{Name: "pickup", Joints: []float64{0, 1.2, -0.5, 0, 0.3, 0}},
 				},
 			},
 		},
