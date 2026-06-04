@@ -135,13 +135,13 @@ type multiPosesExecutionSwitch struct {
 	resource.AlwaysRebuild
 	resource.TriviallyCloseable
 
-	name      resource.Name
-	logger    logging.Logger
-	cfg       *Config
-	mode      string
-	motion    motion.Service // pose mode
-	arm       arm.Arm        // joint mode
-	poseNames []string
+	name          resource.Name
+	logger        logging.Logger
+	cfg           *Config
+	mode          string
+	motion        motion.Service // pose mode
+	arm           arm.Arm        // joint mode
+	waypointNames []string
 
 	mu        sync.Mutex
 	position  uint32
@@ -177,9 +177,9 @@ func newMultiPosesExecutionSwitch(ctx context.Context, deps resource.Dependencie
 		}
 	}
 
-	s.poseNames = make([]string, len(conf.Waypoints))
+	s.waypointNames = make([]string, len(conf.Waypoints))
 	for i, w := range conf.Waypoints {
-		s.poseNames[i] = w.Name
+		s.waypointNames[i] = w.Name
 	}
 
 	return s, nil
@@ -195,7 +195,7 @@ func (s *multiPosesExecutionSwitch) Status(ctx context.Context) (map[string]inte
 
 func (s *multiPosesExecutionSwitch) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
 	if name, ok := cmd["set_position_by_name"].(string); ok {
-		for i, pn := range s.poseNames {
+		for i, pn := range s.waypointNames {
 			if pn == name {
 				if err := s.SetPosition(ctx, uint32(i), nil); err != nil {
 					return nil, err
@@ -210,14 +210,14 @@ func (s *multiPosesExecutionSwitch) DoCommand(ctx context.Context, cmd map[strin
 		s.mu.Lock()
 		pos := s.position
 		s.mu.Unlock()
-		return map[string]interface{}{"position_name": s.poseNames[pos]}, nil
+		return map[string]interface{}{"position_name": s.waypointNames[pos]}, nil
 	}
 
 	return nil, fmt.Errorf("unknown command, supported: set_position_by_name, get_current_position_name")
 }
 
 func (s *multiPosesExecutionSwitch) GetNumberOfPositions(ctx context.Context, extra map[string]interface{}) (uint32, []string, error) {
-	return uint32(len(s.poseNames)), s.poseNames, nil
+	return uint32(len(s.waypointNames)), s.waypointNames, nil
 }
 
 func (s *multiPosesExecutionSwitch) GetPosition(ctx context.Context, extra map[string]interface{}) (uint32, error) {

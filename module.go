@@ -156,18 +156,17 @@ func (s *cupMover) run(ctx context.Context) ([]string, error) {
 	visited := make([]string, 0, len(steps))
 
 	for i, step := range steps {
-		name := step.Waypoint
-		idx, ok := indexByName[name]
+		idx, ok := indexByName[step.Waypoint]
 		if !ok {
-			return visited, fmt.Errorf("waypoint %q not found on switch %q", name, s.cfg.PoseSwitchName)
+			return visited, fmt.Errorf("waypoint %q not found on switch %q", step.Waypoint, s.cfg.PoseSwitchName)
 		}
 
-		s.logger.Infof("step %d/%d: %s (grip=%q)", i+1, len(steps), name, step.Grip)
+		s.logger.Infof("step %d/%d: %s (grip=%q)", i+1, len(steps), step.Waypoint, step.Grip)
 
 		if err := s.sw.SetPosition(ctx, idx, nil); err != nil {
-			return visited, fmt.Errorf("moving to %q: %w", name, err)
+			return visited, fmt.Errorf("moving to %q: %w", step.Waypoint, err)
 		}
-		visited = append(visited, name)
+		visited = append(visited, step.Waypoint)
 
 		if err := s.applyGrip(ctx, step); err != nil {
 			return visited, err
@@ -192,22 +191,21 @@ func (s *cupMover) applyGrip(ctx context.Context, step Step) error {
 	if step.Grip == "" {
 		return nil
 	}
-	name := step.Waypoint
 	if s.gripper == nil {
-		return fmt.Errorf("step %q requests grip=%q but no gripper is configured", name, step.Grip)
+		return fmt.Errorf("step %q requests grip=%q but no gripper is configured", step.Waypoint, step.Grip)
 	}
 	switch step.Grip {
 	case "open":
 		if err := s.gripper.Open(ctx, nil); err != nil {
-			return fmt.Errorf("opening gripper at %q: %w", name, err)
+			return fmt.Errorf("opening gripper at %q: %w", step.Waypoint, err)
 		}
 	case "grab":
 		if _, err := s.gripper.Grab(ctx, nil); err != nil {
-			return fmt.Errorf("grabbing at %q: %w", name, err)
+			return fmt.Errorf("grabbing at %q: %w", step.Waypoint, err)
 		}
 	case "open_grab":
 		if err := s.gripper.Open(ctx, nil); err != nil {
-			return fmt.Errorf("opening gripper at %q: %w", name, err)
+			return fmt.Errorf("opening gripper at %q: %w", step.Waypoint, err)
 		}
 
 		select {
@@ -219,10 +217,10 @@ func (s *cupMover) applyGrip(ctx context.Context, step Step) error {
 		}
 
 		if _, err := s.gripper.Grab(ctx, nil); err != nil {
-			return fmt.Errorf("grabbing at %q: %w", name, err)
+			return fmt.Errorf("grabbing at %q: %w", step.Waypoint, err)
 		}
 	default:
-		return fmt.Errorf("unknown grip %q at step %q (supported: open, grab, open_grab)", step.Grip, name)
+		return fmt.Errorf("unknown grip %q at step %q (supported: open, grab, open_grab)", step.Grip, step.Waypoint)
 	}
 	return nil
 }
