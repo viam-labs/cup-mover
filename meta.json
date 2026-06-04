@@ -20,7 +20,7 @@
     {
       "api": "rdk:service:generic",
       "model": "viam-labs:cup-mover:dial-control-motion",
-      "short_description": "Nudges an arm by configurable steps for interactive waypoint tuning (Cartesian jog, joint jog, or Stream Deck dial) with pose/joint capture.",
+      "short_description": "Nudges an arm by configurable steps for interactive pose tuning (jog or Stream Deck dial).",
       "markdown_link": "README.md#model-viam-labscup-moverdial-control-motion"
     }
   ],

@@ -152,15 +152,7 @@ func (s *dialControlMotion) DoCommand(ctx context.Context, cmd map[string]interf
 		return s.getPose(ctx)
 	}
 
-	if _, ok := cmd["get_joints"]; ok {
-		return s.getJoints(ctx)
-	}
-
-	if v, ok := cmd["jog_joint"]; ok {
-		return s.jogJoint(ctx, v, cmd["by"])
-	}
-
-	return nil, fmt.Errorf("unknown command, supported: jog_{x,y,z,orientation}, dial_move_{x,y,z,orientation}, get_pose, get_joints, jog_joint")
+	return nil, fmt.Errorf("unknown command, supported: jog_{x,y,z,orientation}, dial_move_{x,y,z,orientation}, get_pose")
 }
 
 // jog moves the arm by mm along the given axis. mm may be negative.
@@ -193,50 +185,6 @@ func (s *dialControlMotion) getPose(ctx context.Context) (map[string]interface{}
 		"o_z":   ov.OZ,
 		"theta": ov.Theta,
 	}, nil
-}
-
-// getJoints returns the arm's current joint positions in radians. Output shape
-// matches a multi-poses-execution-switch joint-mode waypoint ("joints").
-func (s *dialControlMotion) getJoints(ctx context.Context) (map[string]interface{}, error) {
-	inputs, err := s.arm.JointPositions(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get joint positions: %w", err)
-	}
-	// referenceframe.Input is a float64 alias (radians for revolute joints).
-	joints := make([]float64, len(inputs))
-	copy(joints, inputs)
-	return map[string]interface{}{"joints": joints}, nil
-}
-
-// jogJoint nudges a single joint by delta radians (delta may be negative),
-// leaving all other joints where they are.
-func (s *dialControlMotion) jogJoint(ctx context.Context, indexVal, byVal interface{}) (map[string]interface{}, error) {
-	idxF, ok := toFloat64(indexVal)
-	if !ok {
-		return nil, fmt.Errorf("jog_joint: invalid joint index %v (expected number)", indexVal)
-	}
-	idx := int(idxF)
-	delta, ok := toFloat64(byVal)
-	if !ok {
-		return nil, fmt.Errorf("jog_joint: invalid or missing \"by\" value %v (expected radians)", byVal)
-	}
-
-	inputs, err := s.arm.JointPositions(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get joint positions: %w", err)
-	}
-	if idx < 0 || idx >= len(inputs) {
-		return nil, fmt.Errorf("jog_joint: index %d out of range (arm has %d joints)", idx, len(inputs))
-	}
-	inputs[idx] += delta
-
-	if err := s.arm.MoveToJointPositions(ctx, inputs, nil); err != nil {
-		return nil, fmt.Errorf("failed to move joints: %w", err)
-	}
-
-	joints := make([]float64, len(inputs))
-	copy(joints, inputs)
-	return map[string]interface{}{"status": "moved", "joint": idx, "by": delta, "joints": joints}, nil
 }
 
 func (s *dialControlMotion) handleMoveArm(ctx context.Context, axis string, mm float64) (map[string]interface{}, error) {

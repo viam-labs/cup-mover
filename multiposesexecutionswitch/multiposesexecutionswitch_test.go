@@ -26,7 +26,7 @@ func TestValidate(t *testing.T) {
 		{
 			name:    "no waypoints",
 			cfg:     Config{ComponentName: "arm", Motion: "builtin"},
-			wantErr: "poses",
+			wantErr: "waypoints",
 		},
 		{
 			name: "missing name",

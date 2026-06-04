@@ -38,20 +38,9 @@ type Config struct {
 // (no gripper action). The same waypoint may appear multiple times with
 // different grips.
 type Step struct {
-	// Waypoint is the switch position name to move to. "pose" is accepted as a
-	// backward-compatible alias.
-	Waypoint string `json:"waypoint,omitempty"`
-	Pose     string `json:"pose,omitempty"`
+	// Waypoint is the switch position name to move to.
+	Waypoint string `json:"waypoint"`
 	Grip     string `json:"grip,omitempty"`
-}
-
-// name returns the switch position name for this step, preferring the newer
-// "waypoint" key and falling back to the legacy "pose" key.
-func (st Step) name() string {
-	if st.Waypoint != "" {
-		return st.Waypoint
-	}
-	return st.Pose
 }
 
 func (cfg *Config) Validate(path string) ([]string, []string, error) {
@@ -167,7 +156,7 @@ func (s *cupMover) run(ctx context.Context) ([]string, error) {
 	visited := make([]string, 0, len(steps))
 
 	for i, step := range steps {
-		name := step.name()
+		name := step.Waypoint
 		idx, ok := indexByName[name]
 		if !ok {
 			return visited, fmt.Errorf("waypoint %q not found on switch %q", name, s.cfg.PoseSwitchName)
@@ -203,7 +192,7 @@ func (s *cupMover) applyGrip(ctx context.Context, step Step) error {
 	if step.Grip == "" {
 		return nil
 	}
-	name := step.name()
+	name := step.Waypoint
 	if s.gripper == nil {
 		return fmt.Errorf("step %q requests grip=%q but no gripper is configured", name, step.Grip)
 	}

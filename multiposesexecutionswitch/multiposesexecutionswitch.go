@@ -53,9 +53,8 @@ type Config struct {
 	// Motion is the motion service to use (pose mode only).
 	Motion string `json:"motion,omitempty"`
 
-	// Waypoints are the saved positions exposed as switch positions. The JSON key
-	// remains "poses" for backward compatibility.
-	Waypoints []Waypoint `json:"poses"`
+	// Waypoints are the saved positions exposed as switch positions.
+	Waypoints []Waypoint `json:"waypoints"`
 }
 
 // Waypoint is one saved position. In pose mode the X/Y/Z + orientation fields
@@ -101,20 +100,20 @@ func (cfg *Config) Validate(path string) ([]string, []string, error) {
 	}
 
 	if len(cfg.Waypoints) == 0 {
-		return nil, nil, resource.NewConfigValidationFieldRequiredError(path, "poses")
+		return nil, nil, resource.NewConfigValidationFieldRequiredError(path, "waypoints")
 	}
 
 	seen := make(map[string]bool, len(cfg.Waypoints))
 	for i, w := range cfg.Waypoints {
 		if w.Name == "" {
-			return nil, nil, fmt.Errorf("%s: poses[%d] is missing required field \"name\"", path, i)
+			return nil, nil, fmt.Errorf("%s: waypoints[%d] is missing required field \"name\"", path, i)
 		}
 		if seen[w.Name] {
-			return nil, nil, fmt.Errorf("%s: poses[%d] has duplicate name %q", path, i, w.Name)
+			return nil, nil, fmt.Errorf("%s: waypoints[%d] has duplicate name %q", path, i, w.Name)
 		}
 		seen[w.Name] = true
 		if mode == ModeJoint && len(w.Joints) == 0 {
-			return nil, nil, fmt.Errorf("%s: poses[%d] (%q) is missing required field \"joints\" in joint mode", path, i, w.Name)
+			return nil, nil, fmt.Errorf("%s: waypoints[%d] (%q) is missing required field \"joints\" in joint mode", path, i, w.Name)
 		}
 	}
 

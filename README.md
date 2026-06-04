@@ -8,9 +8,9 @@ The module ships three models:
 |------------------------------------------------------|----------------------|--------------------------------------------------------------------|
 | `viam-labs:cup-mover:cup-mover`                      | `rdk:service:generic`| Orchestrator. Walks a configured step list and triggers gripper actions. Mode-agnostic — it references switch waypoints by name. |
 | `viam-labs:cup-mover:multi-poses-execution-switch`   | `rdk:component:switch`| Stores N named waypoints; `SetPosition(i)` moves to waypoint `i`. In `pose` mode it plans to an absolute pose via the Motion service; in `joint` mode it commands the arm's joints directly. |
-| `viam-labs:cup-mover:dial-control-motion`            | `rdk:service:generic`| Interactive arm jog + pose/joint capture, suitable for tuning waypoints before saving them. |
+| `viam-labs:cup-mover:dial-control-motion`            | `rdk:service:generic`| Interactive arm jog + pose capture, suitable for tuning pose-mode waypoints before saving them. |
 
-Typical wiring: dial-control to capture waypoints (`get_pose` or `get_joints`) → paste them into the switch → orchestrator runs the sequence.
+Typical wiring: dial-control to capture poses (`get_pose`) → paste them into the switch → orchestrator runs the sequence. For joint-mode waypoints, read the arm's joint positions directly (e.g. the arm's `JointPositions` in the Control tab).
 
 ## Model viam-labs:cup-mover:cup-mover
 
@@ -42,13 +42,11 @@ The orchestrator is mode-agnostic: it only references waypoints by name, so the 
 
 The trailing `pickup-appr → home` retracts the gripper through the approach waypoint and parks it, leaving the arm in a known state for the next run.
 
-> The legacy `"pose"` key is still accepted as an alias for `"waypoint"`, so existing configs keep working.
-
 #### Attributes
 
 | Name               | Type   | Inclusion | Description                                                                                                                                              |
 |--------------------|--------|-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `pose_switch_name` | string | Required  | Name of a switch component (typically `multi-poses-execution-switch`) that owns the poses.                                                               |
+| `pose_switch_name` | string | Required  | Name of a switch component (typically `multi-poses-execution-switch`) that owns the waypoints.                                                           |
 | `gripper_name`     | string | Optional  | If set, the gripper is opened once at the start of every run, and any per-step `grip` actions are dispatched to it. Required if any step has `grip` set. |
 | `steps`            | Step[] | Optional  | Ordered list of `{ waypoint, grip }`. If unset, every waypoint on the switch is visited in switch order with no gripper action.                          |
 | `pause_secs`       | float  | Optional  | Seconds to wait between steps. Defaults to 0.                                                                                                            |
@@ -57,7 +55,7 @@ The trailing `pickup-appr → home` retracts the gripper through the approach wa
 
 | Field      | Description                                                                                                                                                                          |
 |------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `waypoint` | Waypoint name on the switch. (The legacy key `pose` is accepted as an alias.)                                                                                                       |
+| `waypoint` | Waypoint name on the switch.                                                                                                                                                        |
 | `grip`     | Optional gripper action on arrival. One of `"grab"` (close), `"open"`, `"open_grab"` (open, wait 1s for the gripper to settle, then close), or omitted. Same waypoint may be reused. |
 
 ### DoCommand
@@ -91,7 +89,7 @@ Pose mode:
   "component_name": "gripper",
   "motion": "builtin",
   "reference_frame": "world",
-  "poses": [
+  "waypoints": [
     { "name": "home",        "x": 250, "y":   0, "z": 300, "o_z": -1, "theta":   0 },
     { "name": "pickup-appr", "x": 400, "y":   0, "z": 100, "o_z": -1, "theta":   0 },
     { "name": "pickup",      "x": 400, "y":   0, "z":  50, "o_z": -1, "theta":   0 },
@@ -103,13 +101,13 @@ Pose mode:
 }
 ```
 
-Joint mode (joint values are in radians, one per arm joint; capture them with the dial-control `get_joints` command):
+Joint mode (joint values are in radians, one per arm joint; read them from the arm's `JointPositions`, e.g. in the Control tab):
 
 ```jsonc
 {
   "mode": "joint",
   "component_name": "arm",
-  "poses": [
+  "waypoints": [
     { "name": "home",        "joints": [0,     0,      0,     0,     0,    0] },
     { "name": "pickup-appr", "joints": [0,     0.52,  -0.35,  0,     0.61, 0] },
     { "name": "pickup",      "joints": [0,     0.78,  -0.52,  0,     0.79, 0] },
@@ -119,8 +117,6 @@ Joint mode (joint values are in radians, one per arm joint; capture them with th
 }
 ```
 
-> The waypoint array key remains `poses` in both modes for backward compatibility.
-
 #### Attributes
 
 | Name              | Type     | Inclusion              | Description                                                          |
@@ -129,7 +125,7 @@ Joint mode (joint values are in radians, one per arm joint; capture them with th
 | `component_name`  | string   | Required               | In pose mode, the frame to move (`"gripper"` for gripper-tip destinations, `"arm"` for the flange). In joint mode, the arm component to command. |
 | `motion`          | string   | Required in pose mode  | Name of the motion service to use (`"builtin"` for the default). Ignored in joint mode. |
 | `reference_frame` | string   | Optional               | Frame the poses are expressed in (pose mode only). Defaults to `"world"`. |
-| `poses`           | object[] | Required               | Named waypoints. Each requires `name`. Pose mode uses XYZ + OV degrees + theta; joint mode uses `joints` (radians). |
+| `waypoints`       | object[] | Required               | Named waypoints. Each requires `name`. Pose mode uses XYZ + OV degrees + theta; joint mode uses `joints` (radians). |
 
 ### DoCommand
 
@@ -148,13 +144,13 @@ In **joint** mode there is no planner — joint targets are sent straight to the
 
 ## Model viam-labs:cup-mover:dial-control-motion
 
-A `rdk:service:generic` for interactively nudging an arm — useful for tuning waypoints before saving them into the switch. Supports Cartesian jogging plus capture helpers for both pose and joint waypoints:
+A `rdk:service:generic` for interactively nudging an arm — useful for tuning pose-mode waypoints before saving them into the switch. Supports two flows plus a capture helper:
 
 - **Direct jog** — `{ "jog_z": 5 }` moves the arm +5mm on Z (negative values jog the other way). `jog_orientation` moves along the gripper's current orientation vector ("toward / away from where the gripper is pointing").
 - **Stream Deck dial** — `{ "dial_move_z": 47 }` is the absolute dial position; the service infers direction from the delta and moves by the configured step. Handles rollover at the dial's bounds.
-- **Joint jog** — `{ "jog_joint": 2, "by": 0.05 }` nudges joint index 2 by +0.05 radians (negative jogs the other way), leaving the other joints in place. Returns the resulting full joint vector.
-- **Capture pose** — `{ "get_pose": true }` returns the current pose of the configured `frame_name` (defaults to the arm) as `{ x, y, z, o_x, o_y, o_z, theta }` — drop-in compatible with a pose-mode `multi-poses-execution-switch` entry.
-- **Capture joints** — `{ "get_joints": true }` returns the arm's current joint positions as `{ "joints": [...] }` (radians) — drop-in compatible with a joint-mode switch entry.
+- **Capture** — `{ "get_pose": true }` returns the current pose of the configured `frame_name` (defaults to the arm) as `{ x, y, z, o_x, o_y, o_z, theta }` — drop-in compatible with a pose-mode `multi-poses-execution-switch` entry.
+
+> For joint-mode waypoints, read the arm's joint positions directly (the arm's `JointPositions` is shown in the Control tab) and paste them into the switch's `waypoints` as `{ "name": ..., "joints": [...] }`.
 
 ### Configuration
 
@@ -181,13 +177,11 @@ A `rdk:service:generic` for interactively nudging an arm — useful for tuning w
 
 ### Tuning workflow
 
-1. Configure the dial-control service alongside your switch. For pose capture, set `frame_name` to match the switch's `component_name` (typically `"gripper"`) so captured poses go directly into the switch's `poses` array.
-2. From the Control tab, jog the arm to the target:
-   - Cartesian: `jog_x` / `jog_y` / `jog_z` / `jog_orientation` (start with `mm: 5`, drop to `mm: 1` near the target).
-   - Joint: `{ "jog_joint": <index>, "by": <radians> }` to nudge an individual joint.
+1. Configure the dial-control service alongside your switch. For pose capture, set `frame_name` to match the switch's `component_name` (typically `"gripper"`) so captured poses go directly into the switch's `waypoints` array.
+2. From the Control tab, jog the arm to the target with `jog_x` / `jog_y` / `jog_z` / `jog_orientation` (start with `mm: 5`, drop to `mm: 1` near the target).
 3. Once the arm is where you want it, capture the waypoint:
-   - Pose-mode switch: `{ "get_pose": true }` → copy the response into a new `poses` entry (give it a `name`).
-   - Joint-mode switch: `{ "get_joints": true }` → copy `joints` into a new `poses` entry as `{ "name": ..., "joints": [...] }`.
+   - Pose-mode switch: `{ "get_pose": true }` → copy the response into a new `waypoints` entry (give it a `name`).
+   - Joint-mode switch: read the arm's `JointPositions` (Control tab) → copy them into a new `waypoints` entry as `{ "name": ..., "joints": [...] }`.
 4. Repeat for each waypoint, then exercise the sequence with the cup-mover service → `{ "run": true }`.
 
 ## Build
